@@ -203,5 +203,3 @@ ggplot(averageTopicsPerYearIncLL, aes(x = year, y = averageTopicsPerYear, colour
   geom_line()+
   geom_smooth(method = NULL)+
   ggtitle("Average Number of Topics Per Year in Booker Prize Shortlist and Longlist")
-
-save.image("bookerCodeForRafA.rds")
