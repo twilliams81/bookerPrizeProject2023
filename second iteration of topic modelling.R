@@ -156,33 +156,50 @@ cleanerBookerTD_gamma35 <- bookerTD_gamma35 %>%  separate_wider_delim("title", d
 cleanerBookerTD_gamma35 <- as_tibble(merge(x = cleanerBookerTD_gamma35, y = bookerDatesAwardsAuthor_tb, by = "title", all.x = TRUE)) 
 
 
-#This is where I'm getting stuck. So here are two graphs. 
-#
-#
-#This first is pretty cool. It shows the number of times each topic features in a text section. Now, technically, all topics feature in all texts so I've filtered out anything with a gamma <0.2 which is reasonably standard. A topic with a probability of being in a novel_section great that 0.2 is either medium present or strongly present. Importantly, note that Topic 2 *seems* to be the most common topic and it *seems* to get more popular over time.
-cleanerBookerTD_gamma35 %>% 
-  filter(gamma >= 0.2
-         & award != "longlist") %>% 
-  ggplot(aes(year,gamma))+
-  geom_bar(position = "stack", stat = "identity")+
-  facet_wrap(~topic)+
-  theme_minimal()+
-  labs (title = "topics over time")
+totalTopicsPerTitle <- cleanerBookerTD_gamma35 %>% 
+  filter (gamma >=0.2) %>% 
+  group_by(title) %>% 
+  count(topic) %>% 
+  rename('topicCount' = n) %>% 
+  summarise(totalTopics = sum(topicCount))
+
+averageTopicsPerTitle <-  totalTopicsPerTitle %>% 
+  full_join(title_count_tb, by = 'title') %>% 
+  mutate(averageTopicsPerSection = totalTopics/totalSections) %>% 
+  mutate(across(everything(), ~replace_na(.x,0))) %>% 
+  mutate(award = ifelse(award == 'Winner', "Shortlist", award))
+
+averageTopicsPerYear <- averageTopicsPerTitle %>% 
+  filter(award != 'Longlist') %>% 
+  group_by(year) %>% 
+  summarise(mean(averageTopicsPerSection)) %>% 
+  rename("averageTopicsPerYear" = "mean(averageTopicsPerSection)")
 
 
-#Lets look more closely at Topic 2. I couldn't get it to fut in the Plot viewer with the filter set to >= 0.2 so I increased it to 0.6 Now what becomes clear is that a small number of novels account for the heavy presence of topic 2 after 2000. In 2003 it is very present in FINGERSMITH and it's also very present in 2006 in THE NIGHT WATCH (they're by the same author). 
-cleanerBookerTD_gamma35 %>% 
-  filter(topic == "2" &
-           gamma >= 0.6) %>% 
-  ggplot(aes(year,gamma, colour = title))+
-  geom_point()+
-  theme_minimal()+
-  labs (title = " topic 2 over time")
+averageTopicsPerYearIncLL <- averageTopicsPerTitle %>% 
+  group_by(year, award) %>% 
+  summarise(mean(averageTopicsPerSection)) %>% 
+  rename("averageTopicsPerYear" = "mean(averageTopicsPerSection)") 
+
+#Removing 1970s longlist for clarity. 1970 is an outlier and had a longlist. After 2000 the Booker prize always released the longlist which I've left in.
+averageTopicsPerYearIncLL <- averageTopicsPerYearIncLL [-2,]
+
+View(averageTopicsPerYearIncLL)
 
 
-#Here are my core questions at this stage.
-# 1. How do I account for the novel_sections? Obviously the longer the novel, the more novel sections there are and so a topic can appear to be strong when, in fact, it only appears strongly in one novel but in many, many sections?
-# 
-# 2. I'd like to demonstrate the change in topics over time. Ideally I'd have a line chart that plots the popularity of different topics between 1970 and 2010 but, firstly, I need to deal with problem 1.
-# 
-# 3. I've exported the data to excel (I'm more confident there) with the filter set to a gamma >= 0.2 and I can see that Topic 2 is really important (the file is attached) but I need to replicate the pivot table in R ideally. Then, assuming I have handled the issue 1, I'd use the pivot table to calculate the heterogenity of the novels i.e. which novels contain the most topics and which the fewest.
+#checking that there is comparable data in averages
+averageTopicsPerTitle %>% 
+  filter(award != 'Longlist') %>% 
+  View()
+
+#Average topics over time as plots
+
+ggplot(averageTopicsPerYear, aes(x = year, y = averageTopicsPerYear))+
+  geom_line()+
+  geom_smooth(method = NULL)+
+  ggtitle("Average Number of Topics Per Year in Booker Prize Shortlist")
+
+ggplot(averageTopicsPerYearIncLL, aes(x = year, y = averageTopicsPerYear, colour = award))+
+  geom_line()+
+  geom_smooth(method = NULL)+
+  ggtitle("Average Number of Topics Per Year in Booker Prize Shortlist and Longlist")
